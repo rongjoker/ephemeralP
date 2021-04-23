@@ -43,3 +43,4 @@ class Solution:
 
 a = Solution()
 print(a.threeSum([-1, 0, 1, 2, -1, -4]))
+print(100 & 1)
