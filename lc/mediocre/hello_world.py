@@ -1,7 +1,4 @@
-import sys
-import random
-
-from mediocre import quantity_candidate, quality_candidate
+from lc.mediocre import quantity_candidate, quality_candidate
 
 print(' hello world')
 a = 1
