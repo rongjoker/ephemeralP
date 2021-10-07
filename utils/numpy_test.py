@@ -123,7 +123,7 @@ while True:
     except StopIteration:
         print('stop!')
         break
-# 哈希表 + items + next 判断
+# 集合 + items + next 判断
 citiesA1 = {path for path in dictionary2}
 citiesA2 = {4}
 print(citiesA1)
@@ -145,3 +145,16 @@ def destCity(self, paths: List[List[str]]) -> str:
 def destCity2(self, paths: List[List[str]]) -> str:
     citiesA = {path[0] for path in paths}
     return next(path[1] for path in paths if path[1] not in citiesA)
+
+
+# zip
+col1 = ['name', 'age', 'gender']
+col2 = ['joker', 12, 'male']
+for a, b in zip(col1, col2):
+    print(a, ':', b)
+
+# **
+# *args 与 **kwargs 的区别，两者都是 python 中的可变参数：
+#
+#  *args 表示任何多个无名参数，它本质是一个 tuple
+# **kwargs 表示关键字参数，它本质上是一个 dict
