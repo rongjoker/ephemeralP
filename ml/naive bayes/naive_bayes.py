@@ -8,8 +8,9 @@
 @time: 2019/5/12 9:41
 '''
 
-import numpy as  np
+import numpy as np
 import pandas as pd
+
 
 class Naive_Bayes:
     def __init__(self):
@@ -55,4 +56,3 @@ if __name__ == "__main__":
     nb = Naive_Bayes()
     classes, class_prior, prior = nb.nb_fit(X, y)
     print('测试数据预测类别为：', nb.predict(X_test))
-

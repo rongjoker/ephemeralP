@@ -45,4 +45,4 @@ class PictureRead:
 
 
 a = PictureRead()
-a.read_file("/Users/zhangshipeng/Downloads/fd/compute_photo/test1/demo.bmp")
+a.read_file("/Users/zhangshipeng/Downloads/fd/compute_img_tech/test1/demo.bmp")

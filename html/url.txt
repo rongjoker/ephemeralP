@@ -1,0 +1,38 @@
+postgresql也很强大，为何在中国大陆，mysql成为主流，postgresql屈居二线呢？
+https://www.zhihu.com/question/31955622/answer/1625152059
+如何看待王垠对数据库的理解？
+https://www.zhihu.com/question/329153374/answer/717739553
+为什么技术主管跟我说程序员学算法不是最重要的，从工作项目中学习实际才是最重要的？
+https://www.zhihu.com/question/350929200/answer/861464037
+既然Java反射可以访问和修改私有成员变量，那封装成private还有意义么？
+https://www.zhihu.com/question/28161668/answer/518225224
+为什么数据库和数据库连接池不采用类似java nio的IO多路复用技术使用一个连接来维护和数据库的数据交换？
+https://www.zhihu.com/question/23084473/answer/334920663
+为什么一定要弄一个Builder内部类？
+https://www.zhihu.com/question/326142180/answer/697172067
+Spring是否代表着目前Java技术的顶峰，未来的Java将如何发展？
+https://www.zhihu.com/question/387902282/answer/1198090641
+IO多路复用和线程池哪个效率更高，更有优势？
+https://www.zhihu.com/question/306267779/answer/570147888
+cas做了锁了总线或缓存行还是volatile做了锁总线或缓存行?
+https://www.zhihu.com/question/65372648/answer/415311977
+为什么说java spi破坏双亲委派模型？
+https://www.zhihu.com/question/49667892/answer/690288611
+为何谷歌之类大厂程序员认为敏捷开发是瞎扯淡？
+https://www.zhihu.com/question/340916482/answer/794400913
+数据库MVCC和隔离级别的关系是什么？
+https://www.zhihu.com/question/279538775/answer/407458020
+微服务架构中如何解决连表查询的问题？
+https://www.zhihu.com/question/66256777/answer/976182648
+JAVA面试经常会被问题 JVM调优？
+https://www.zhihu.com/question/268821097/answer/342151672
+为什么只有Java多线程有可见性问题？
+https://www.zhihu.com/question/330803860/answer/724901797
+数据库事务原子性、一致性是怎样实现的？
+https://www.zhihu.com/question/30272728/answer/1065480731
+Kafka事务到底是什么意思？
+https://www.zhihu.com/question/311885878/answer/596759488
+Java 中的双亲委派的“双”怎么理解 ？
+https://www.zhihu.com/question/288949359/answer/468524259
+使用redis做减库存、下单，如何保证这两步操作的要么都成功要么都失败?
+https://www.zhihu.com/question/268937734/answer/344013478
