@@ -1,5 +1,6 @@
 from cmath import sin, cos, pi
 from typing import List
+import matplotlib.pyplot as plt
 
 
 class FFT_pack():
@@ -93,7 +94,21 @@ if __name__ == '__main__':
     list = []
     for a in arrays:
         if len(a) > 0:
+            print(float(a))
             list.append(float(a))
     # list = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]
     a = FFT_pack().FFT(list, 16, False)
     print(a)
+
+    plt.figure(figsize=(8,6))
+    plt.subplot(211)
+    plt.xlabel('Time')
+    plt.ylabel('Amplitude')
+    plt.plot(x, data)
+
+    plt.subplot(212)
+    plt.xlabel('Freq(HZ)')
+    plt.ylabel('|Y(freq)|')
+    plt.plot(freq, np.abs(sp.real), np.abs(sp.imag))
+
+    plt.show()
