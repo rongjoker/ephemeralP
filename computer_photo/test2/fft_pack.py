@@ -104,11 +104,12 @@ if __name__ == '__main__':
     plt.subplot(211)
     plt.xlabel('Time')
     plt.ylabel('Amplitude')
-    plt.plot(x, data)
+    plt.plot(list, list)
 
     plt.subplot(212)
     plt.xlabel('Freq(HZ)')
     plt.ylabel('|Y(freq)|')
-    plt.plot(freq, np.abs(sp.real), np.abs(sp.imag))
+    plt.plot(a, a)
+
 
     plt.show()
