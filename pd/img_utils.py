@@ -33,7 +33,7 @@ def evaluation(model, datasets):
 val_dataset = nb.MnistDataset(mode='valid')
 val_loader = paddle.io.DataLoader(val_dataset, batch_size=10, drop_last=True)
 mod = nb.MNIST()
-params_file_path = 'mnist_200_200.pdparams'
+params_file_path = 'model/mnist_200_200.pdparams'
 param_dict = paddle.load(params_file_path)
 mod.load_dict(param_dict)
 

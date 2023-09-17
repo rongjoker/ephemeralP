@@ -77,7 +77,7 @@ def train(model, bs=20, es=10, model_name='mnist.pdparams'):
         acc_val_mean = evaluation(model, val_loader)
         print('train_acc: {}, val acc: {}'.format(acc_train_mean, acc_val_mean))
     # 保存模型参数
-    paddle.save(model.state_dict(), model_name)
+    paddle.save(model.state_dict(), "model/"+model_name)
 
 
 # 声明网络结构

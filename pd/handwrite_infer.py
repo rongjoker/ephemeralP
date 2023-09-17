@@ -27,7 +27,7 @@ def infer():
     # 定义预测过程
     # model = nb.LeNet(num_classes=10)
     model = nb.MNIST()
-    params_file_path = 'mnist_200_200.pdparams'
+    params_file_path = 'model/mnist_200_200.pdparams'
     # test_212_9
     # test_213_3
     # test_328_7
@@ -65,8 +65,9 @@ def read_photo():
     # resnet mnist_120_20  accuracy: 9651 / 10000
     # resnet mnist_120_30  accuracy: 9771 / 10000
     model = nb.ResNet(layers=50, class_dim=10)
-    params_file_path = 'mnist_120_30.pdparams'
-    img_path = 'C:/360Downloads\迅雷下载/test'
+    params_file_path = 'model/mnist_120_30.pdparams'
+    # img_path = 'C:/360Downloads\迅雷下载/test'
+    img_path = 'work/xiaowang'
     param_dict = paddle.load(params_file_path)
     model.load_dict(param_dict)
     # 灌入数据
