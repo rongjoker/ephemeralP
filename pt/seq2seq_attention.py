@@ -14,8 +14,8 @@ class Seq2SeqEncoder(d2l.Encoder):
         super(Seq2SeqEncoder, self).__init__(**kwargs)
         # 嵌入层
         self.embedding = nn.Embedding(vocab_size, embed_size)
-        self.rnn = nn.GRU(embed_size, num_hiddens, num_layers,
-                          dropout=dropout)
+        self.rnn = nn.LSTM(embed_size, num_hiddens, num_layers,
+                           dropout=dropout)
 
     def forward(self, X, *args):
         # 输出'X'的形状：(batch_size,num_steps,embed_size)
@@ -29,31 +29,69 @@ class Seq2SeqEncoder(d2l.Encoder):
         return output, state
 
 
-class Seq2SeqDecoder(d2l.Decoder):
-    """用于序列到序列学习的循环神经网络解码器"""
+# @save
+class AttentionDecoder(d2l.Decoder):
+    """带有注意力机制解码器的基本接口"""
 
+    def __init__(self, **kwargs):
+        super(AttentionDecoder, self).__init__(**kwargs)
+
+    @property
+    def attention_weights(self):
+        raise NotImplementedError
+
+
+# https://www.bilibili.com/list/1567748478?sid=358497&spm_id_from=333.999.0.0&desc=1&oid=974654755&bvid=BV1v44y1C7Tg&p=2
+class Seq2SeqAttentionDecoder(AttentionDecoder):
     def __init__(self, vocab_size, embed_size, num_hiddens, num_layers,
                  dropout=0, **kwargs):
-        super(Seq2SeqDecoder, self).__init__(**kwargs)
+        super(Seq2SeqAttentionDecoder, self).__init__(**kwargs)
+        self.attention = d2l.AdditiveAttention(
+            num_hiddens, num_hiddens, num_hiddens, dropout)
         self.embedding = nn.Embedding(vocab_size, embed_size)
-        self.rnn = nn.GRU(embed_size + num_hiddens, num_hiddens, num_layers,
-                          dropout=dropout)
+        self.rnn = nn.LSTM(
+            embed_size + num_hiddens, num_hiddens, num_layers,
+            dropout=dropout)
         self.dense = nn.Linear(num_hiddens, vocab_size)
 
-    def init_state(self, enc_outputs, *args):
-        return enc_outputs[1]
+    def init_state(self, enc_outputs, enc_valid_lens, *args):
+        # outputs的形状为(batch_size，num_steps，num_hiddens).
+        # hidden_state的形状为(num_layers，batch_size，num_hiddens)
+        outputs, hidden_state = enc_outputs
+        return (outputs.permute(1, 0, 2), hidden_state, enc_valid_lens)
 
     def forward(self, X, state):
-        # 输出'X'的形状：(batch_size,num_steps,embed_size)
+        # enc_outputs的形状为(batch_size,num_steps,num_hiddens).
+        # hidden_state的形状为(num_layers,batch_size,
+        # num_hiddens)
+        enc_outputs, hidden_state, enc_valid_lens = state
+        # 输出X的形状为(num_steps,batch_size,embed_size)
         X = self.embedding(X).permute(1, 0, 2)
-        # 广播context，使其具有与X相同的num_steps
-        context = state[-1].repeat(X.shape[0], 1, 1)
-        X_and_context = torch.cat((X, context), 2)
-        output, state = self.rnn(X_and_context, state)
-        output = self.dense(output).permute(1, 0, 2)
-        # output的形状:(batch_size,num_steps,vocab_size)
-        # state的形状:(num_layers,batch_size,num_hiddens)
-        return output, state
+        outputs, self._attention_weights = [], []
+        for x in X:
+            # query的形状为(batch_size,1,num_hiddens)
+            if isinstance(self.rnn, nn.GRU):
+                query = torch.unsqueeze(hidden_state[-1], dim=1)
+            else:
+                query = torch.unsqueeze(hidden_state[0][-1], dim=1)
+            # context的形状为(batch_size,1,num_hiddens)
+            context = self.attention(
+                query, enc_outputs, enc_outputs, enc_valid_lens)
+            # 在特征维度上连结
+            x = torch.cat((context, torch.unsqueeze(x, dim=1)), dim=-1)
+            # 将x变形为(1,batch_size,embed_size+num_hiddens)
+            out, hidden_state = self.rnn(x.permute(1, 0, 2), hidden_state)
+            outputs.append(out)
+            self._attention_weights.append(self.attention.attention_weights)
+        # 全连接层变换后，outputs的形状为
+        # (num_steps,batch_size,vocab_size)
+        outputs = self.dense(torch.cat(outputs, dim=0))
+        return outputs.permute(1, 0, 2), [enc_outputs, hidden_state,
+                                          enc_valid_lens]
+
+    @property
+    def attention_weights(self):
+        return self._attention_weights
 
 
 # @save
@@ -83,87 +121,20 @@ class MaskedSoftmaxCELoss(nn.CrossEntropyLoss):
         return weighted_loss
 
 
-#@save
-class AttentionDecoder(d2l.Decoder):
-    """带有注意力机制解码器的基本接口"""
-    def __init__(self, **kwargs):
-        super(AttentionDecoder, self).__init__(**kwargs)
+class EncoderDecoder(nn.Module):
+    """The base class for the encoder-decoder architecture.
 
-    @property
-    def attention_weights(self):
-        raise NotImplementedError
+    Defined in :numref:`sec_encoder-decoder`"""
 
+    def __init__(self, encoder, decoder, **kwargs):
+        super(EncoderDecoder, self).__init__(**kwargs)
+        self.encoder = encoder
+        self.decoder = decoder
 
-# https://www.bilibili.com/list/1567748478?sid=358497&spm_id_from=333.999.0.0&desc=1&oid=974654755&bvid=BV1v44y1C7Tg&p=2
-class Seq2SeqAttentionDecoder(AttentionDecoder):
-    def __init__(self, vocab_size, embed_size, num_hiddens, num_layers,
-                 dropout=0, **kwargs):
-        super(Seq2SeqAttentionDecoder, self).__init__(**kwargs)
-        self.attention = d2l.AdditiveAttention(
-            num_hiddens, num_hiddens, num_hiddens, dropout)
-        self.embedding = nn.Embedding(vocab_size, embed_size)
-        self.rnn = nn.GRU(
-            embed_size + num_hiddens, num_hiddens, num_layers,
-            dropout=dropout)
-        self.dense = nn.Linear(num_hiddens, vocab_size)
-
-    def init_state(self, enc_outputs, enc_valid_lens, *args):
-        # outputs的形状为(batch_size，num_steps，num_hiddens).
-        # hidden_state的形状为(num_layers，batch_size，num_hiddens)
-        outputs, hidden_state = enc_outputs
-        return (outputs.permute(1, 0, 2), hidden_state, enc_valid_lens)
-
-    def forward(self, X, state):
-        # enc_outputs的形状为(batch_size,num_steps,num_hiddens).
-        # hidden_state的形状为(num_layers,batch_size,
-        # num_hiddens)
-        enc_outputs, hidden_state, enc_valid_lens = state
-        # 输出X的形状为(num_steps,batch_size,embed_size)
-        X = self.embedding(X).permute(1, 0, 2)
-        outputs, self._attention_weights = [], []
-        for x in X:
-            # query的形状为(batch_size,1,num_hiddens)
-            query = torch.unsqueeze(hidden_state[-1], dim=1)
-            # context的形状为(batch_size,1,num_hiddens)
-            context = self.attention(
-                query, enc_outputs, enc_outputs, enc_valid_lens)
-            # 在特征维度上连结
-            x = torch.cat((context, torch.unsqueeze(x, dim=1)), dim=-1)
-            # 将x变形为(1,batch_size,embed_size+num_hiddens)
-            out, hidden_state = self.rnn(x.permute(1, 0, 2), hidden_state)
-            outputs.append(out)
-            self._attention_weights.append(self.attention.attention_weights)
-        # 全连接层变换后，outputs的形状为
-        # (num_steps,batch_size,vocab_size)
-        outputs = self.dense(torch.cat(outputs, dim=0))
-        return outputs.permute(1, 0, 2), [enc_outputs, hidden_state,
-                                          enc_valid_lens]
-
-    @property
-    def attention_weights(self):
-        return self._attention_weights
-
-
-# https://zh-v2.d2l.ai/chapter_attention-mechanisms/self-attention-and-positional-encoding.html
-# https://www.bilibili.com/list/1567748478?sid=358497&spm_id_from=333.999.0.0&desc=1&oid=377288232&bvid=BV19o4y1m7mo&p=2
-#@save
-class PositionalEncoding(nn.Module):
-    """位置编码"""
-    def __init__(self, num_hiddens, dropout, max_len=1000):
-        super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(dropout)
-        # 创建一个足够长的P
-        self.P = torch.zeros((1, max_len, num_hiddens))
-        X = torch.arange(max_len, dtype=torch.float32).reshape(
-            -1, 1) / torch.pow(10000, torch.arange(
-            0, num_hiddens, 2, dtype=torch.float32) / num_hiddens)
-        self.P[:, :, 0::2] = torch.sin(X)
-        self.P[:, :, 1::2] = torch.cos(X)
-
-    def forward(self, X):
-        X = X + self.P[:, :X.shape[1], :].to(X.device)
-        return self.dropout(X)
-
+    def forward(self, enc_X, dec_X, *args):
+        enc_outputs = self.encoder(enc_X, *args)
+        dec_state = self.decoder.init_state(enc_outputs, *args)
+        return self.decoder(dec_X, dec_state)
 
 
 # @save
@@ -259,27 +230,47 @@ def bleu(pred_seq, label_seq, k):  # @save
     return score
 
 
+def try_gpu():
+    return torch.device('cuda:0')
+
+
 embed_size, num_hiddens, num_layers, dropout = 32, 32, 2, 0.1
 batch_size, num_steps = 64, 10
-lr, num_epochs, device = 0.005, 300, d2l.try_gpu()
-
+lr, num_epochs, device = 0.005, 500, try_gpu()
 train_iter, src_vocab, tgt_vocab = d2l.load_data_nmt(batch_size, num_steps)
-encoder = Seq2SeqEncoder(len(src_vocab), embed_size, num_hiddens, num_layers,
-                         dropout)
-decoder = Seq2SeqDecoder(len(tgt_vocab), embed_size, num_hiddens, num_layers,
-                         dropout)
-# 修改为注意力
-# https://www.bilibili.com/list/1567748478?sid=358497&spm_id_from=333.999.0.0&desc=1&oid=974654755&bvid=BV1v44y1C7Tg&p=2
-# decoder = Seq2SeqAttentionDecoder(
-#     len(tgt_vocab), embed_size, num_hiddens, num_layers, dropout)
-net = d2l.EncoderDecoder(encoder, decoder)
-train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
+
+
+def train():
+    encoder = Seq2SeqEncoder(len(src_vocab), embed_size, num_hiddens, num_layers,
+                             dropout)
+    decoder = Seq2SeqAttentionDecoder(len(tgt_vocab), embed_size, num_hiddens, num_layers,
+                                      dropout)
+    # 修改为注意力
+    # https://www.bilibili.com/list/1567748478?sid=358497&spm_id_from=333.999.0.0&desc=1&oid=974654755&bvid=BV1v44y1C7Tg&p=2
+    # decoder = Seq2SeqAttentionDecoder(
+    #     len(tgt_vocab), embed_size, num_hiddens, num_layers, dropout)
+    net = EncoderDecoder(encoder, decoder)
+    train_seq2seq(net, train_iter, lr, num_epochs, tgt_vocab, device)
+    # torch.save(net, 'model/seq2seq.pth', pickle_module=EncoderDecoder)
+    torch.save(net.state_dict(), 'model/seq2seq_attention.pth')
 
 
 def infer():
+    encoder = Seq2SeqEncoder(len(src_vocab), embed_size, num_hiddens, num_layers,
+                             dropout)
+    decoder = Seq2SeqAttentionDecoder(len(tgt_vocab), embed_size, num_hiddens, num_layers,
+                                      dropout)
+    net = EncoderDecoder(encoder, decoder)
+    net.load_state_dict(torch.load('model/seq2seq_attention.pth'))
+    net = net.to(try_gpu())
+    net.eval()
     engs = ['go .', "i lost .", 'he\'s calm .', 'i\'m home .']
     fras = ['va !', 'j\'ai perdu .', 'il est calme .', 'je suis chez moi .']
     for eng, fra in zip(engs, fras):
         translation, attention_weight_seq = predict_seq2seq(
             net, eng, src_vocab, tgt_vocab, num_steps, device)
         print(f'{eng} => {translation}, bleu {bleu(translation, fra, k=2):.3f}')
+
+
+# train()
+infer()
