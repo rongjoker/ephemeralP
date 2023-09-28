@@ -6,26 +6,25 @@ import d2l_torch as d2l
 import cnn_base as base
 
 
-# 0.9375 batch_size 256 max_epochs 20
-def vit_train():
+def vit_train(epoch=10, batch_size=128):
     img_size, patch_size = 96, 16
     num_hiddens, mlp_num_hiddens, num_heads, num_blks = 512, 2048, 8, 2
     emb_dropout, blk_dropout, lr = 0.1, 0.1, 0.1
     model = base.ViT(img_size, patch_size, num_hiddens, mlp_num_hiddens, num_heads,
                      num_blks, emb_dropout, blk_dropout, lr)
-    trainer = d2l.Trainer(max_epochs=20, num_gpus=1)
-    data = d2l.FashionMNIST(batch_size=256, resize=(img_size, img_size))
+    trainer = d2l.Trainer(max_epochs=epoch, num_gpus=1)
+    data = d2l.FashionMNIST(batch_size=batch_size, resize=(img_size, img_size))
     trainer.fit(model, data)
     torch.save(model.state_dict(), 'model/fashion_mnist_vit.pth')
 
 
-def resnet_train():
+def resnet_train(epoch=10, batch_size=128):
     # 10 epoch acc: tensor(0.9375, device='cuda:0')
     base.ResNet18().layer_summary((1, 1, 96, 96))
 
     model = base.ResNet18(lr=0.01)
-    trainer = d2l.Trainer(max_epochs=10, num_gpus=1)
-    data = d2l.FashionMNIST(batch_size=128, resize=(96, 96))
+    trainer = d2l.Trainer(max_epochs=epoch, num_gpus=1)
+    data = d2l.FashionMNIST(batch_size=batch_size, resize=(96, 96))
     model.apply_init([next(iter(data.get_dataloader(True)))[0]], d2l.init_cnn)
     trainer.fit(model, data)
     torch.save(model.state_dict(), 'model/fashion_mnist_resnet.pth')
@@ -135,8 +134,10 @@ def vit_infer():
     print(get_fashion_mnist_labels([predicted_class.item()]))
 
 
-# resnet_train()
-# resnet_infer()
-# vit_train()
-vit_infer()
-
+# max_epochs=50 batch_size=256 0.9375
+# max_epochs=50 batch_size=128
+# resnet_train(epoch=50, batch_size=128)
+resnet_infer()
+# 0.9375 batch_size 256 max_epochs 20
+# vit_train(epoch=50, batch_size=256)
+# vit_infer()

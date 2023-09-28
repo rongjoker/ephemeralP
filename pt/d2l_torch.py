@@ -225,12 +225,12 @@ class Module(d2l.nn_Module, d2l.HyperParameters):
     def training_step(self, batch):
         l = self.loss(self(*batch[:-1]), batch[-1])
         self.plot('loss', l, train=True)
-        print('loss:', l)
+        # print('loss:', l)
         return l
 
     def validation_step(self, batch):
         l = self.loss(self(*batch[:-1]), batch[-1])
-        print('loss:', l)
+        # print('loss:', l)
         self.plot('loss', l, train=False)
 
     def configure_optimizers(self):
@@ -1627,6 +1627,7 @@ def train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs,
                             legend=['train loss', 'train acc', 'test acc'])
     net = nn.DataParallel(net, device_ids=devices).to(devices[0])
     for epoch in range(num_epochs):
+        print('epoch:', epoch)
         # Sum of training loss, sum of training accuracy, no. of examples,
         # no. of predictions
         metric = d2l.Accumulator(4)
@@ -2327,7 +2328,7 @@ class TokenEmbedding:
         data_dir = d2l.download_extract(embedding_name)
         # GloVe website: https://nlp.stanford.edu/projects/glove/
         # fastText website: https://fasttext.cc/
-        with open(os.path.join(data_dir, 'vec.txt'), 'r') as f:
+        with open(os.path.join(data_dir, 'vec.txt'), 'r',encoding='utf-8') as f:
             for line in f:
                 elems = line.rstrip().split(' ')
                 token, elems = elems[0], [float(elem) for elem in elems[1:]]
