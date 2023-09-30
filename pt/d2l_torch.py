@@ -1608,6 +1608,9 @@ def train_batch_ch13(net, X, y, loss, trainer, devices):
     y = y.to(devices[0])
     net.train()
     trainer.zero_grad()
+    # print('X[0].shape:', X[0].shape)
+    # print('X[1].shape:', X[1].shape)
+    # print('X[2].shape:', X[2].shape)
     pred = net(X)
     l = loss(pred, y)
     l.sum().backward()
@@ -1627,7 +1630,7 @@ def train_ch13(net, train_iter, test_iter, loss, trainer, num_epochs,
                             legend=['train loss', 'train acc', 'test acc'])
     net = nn.DataParallel(net, device_ids=devices).to(devices[0])
     for epoch in range(num_epochs):
-        print('epoch:', epoch)
+        # print('epoch:', epoch)
         # Sum of training loss, sum of training accuracy, no. of examples,
         # no. of predictions
         metric = d2l.Accumulator(4)

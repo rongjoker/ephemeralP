@@ -4,6 +4,8 @@ import torchvision.transforms as transforms
 from PIL import Image
 import d2l_torch as d2l
 import cnn_base as base
+import numpy as np
+import os
 
 
 def vit_train(epoch=10, batch_size=128):
@@ -31,13 +33,13 @@ def resnet_train(epoch=10, batch_size=128):
 
 
 # 定义一个函数来加载并预处理图像
+# todo 对于图片将所有的灰度(0-255)全部映射到(0.01-0.99)上
 def preprocess_image(image_path):
     transform = transforms.Compose([
         transforms.Resize((96, 96)),
-        transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        transforms.ToTensor()
     ])
-    # image = Image.open(image_path)
+    # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     image = Image.open(image_path).convert('L')  # 将图像转换为灰阶
     image = transform(image).unsqueeze(0)
     return image
@@ -60,6 +62,9 @@ def predict_ch3(net, test_iter, n=6):  # @save
         break
     # todo
     X = X.to(try_gpu())
+    first = X[0][0]
+    print(first.argmax(axis=0))
+    # 图像没有归一化，打印出来最大是这样的 66, 66, 66, 66, 67, 67, 67, 69, 69, 70, 70, 70, 70, 70, 70, 70, 70, 70
     print(X.shape)
     y = y.to(try_gpu())
     possibility = net(X)
@@ -134,10 +139,68 @@ def vit_infer():
     print(get_fashion_mnist_labels([predicted_class.item()]))
 
 
+def renet_infer_batch():
+    # 加载预训练的ResNet模型
+    model = base.ResNet18(lr=0.01)
+    model.load_state_dict(torch.load('model/fashion_mnist_resnet.pth'))
+    model = model.to(try_gpu())
+    # model = models.resnet50(pretrained=True)
+    model.eval()  # 设置模型为推理模式
+    input_image_list = []
+    for file in os.listdir('test'):
+        print(file)
+        out_ = preprocess_image(  'test/' + file)
+        input_image_list.append(out_[0])
+    ndarray_data = np.asarray(input_image_list)
+    input_image = torch.from_numpy(ndarray_data)
+
+    # 读取要分类的图像
+    # image_path = 'test/pant1.png'  # 替换成你的图像文件路径
+    # input_image = preprocess_image(image_path)
+    # print(input_image.shape)
+    # input_image = [input_image[0] for _ in (0, 10)]
+    # ndarray_data = np.asarray(input_image)
+    # input_image = torch.from_numpy(ndarray_data)
+    # print(input_image.shape)
+    # print(type(input_image))
+    # todo
+    # 单个是torch.Size([1, 1, 96, 96])
+    # need torch.Size([256, 1, 96, 96])
+    # 进行推理
+    with torch.no_grad():
+        output = model(input_image.to(try_gpu()))
+
+    # 获取类别标签
+    infer_ret = output.argmax(axis=1)
+    print(d2l.get_fashion_mnist_labels(infer_ret))
+    # _, predicted_class = output.max(1)
+    # print(get_fashion_mnist_labels([predicted_class.item()]))
+
+
+def get_img(path):
+    transform = transforms.Compose([
+        transforms.Resize((96, 96)),
+        transforms.ToTensor()
+    ])
+    img = Image.open(path).convert('L')
+    im = np.array(img)
+    # ndarray_data = np.asarray(input_image)
+    input_image = torch.from_numpy(im)
+    print(input_image.shape)
+    print(im.argmax(axis=0))
+    # doing this so that it is consistent with all other datasets
+    # to return a PIL Image
+    img = transform(img)
+    print(img[0].argmax(axis=0))
+    print(img.shape)
+
+
 # max_epochs=50 batch_size=256 0.9375
 # max_epochs=50 batch_size=128
 # resnet_train(epoch=50, batch_size=128)
-resnet_infer()
+# resnet_infer()
+renet_infer_batch()
 # 0.9375 batch_size 256 max_epochs 20
 # vit_train(epoch=50, batch_size=256)
 # vit_infer()
+# get_img('test/pant1.png')

@@ -8,6 +8,13 @@ import rnn_base
 logger = logging.getLogger('sentiment-analysis-rnn')
 logger.setLevel(logging.INFO)
 
+logger.info('loading dataset imdb start')
+print('loading dataset imdb start: ', datetime.datetime.now())
+batch_size = 128
+train_iter, test_iter, vocab = d2l.load_data_imdb(batch_size)
+logger.info('loading dataset imdb end')
+print('loading dataset imdb end:', datetime.datetime.now())
+
 
 def lstm_train(lr=0.01, epochs=5):
     def init_weights(module):
@@ -18,10 +25,6 @@ def lstm_train(lr=0.01, epochs=5):
                 if "weight" in param:
                     nn.init.xavier_uniform_(module._parameters[param])
 
-    logger.info('loading dataset imdb start')
-    batch_size = 64
-    train_iter, test_iter, vocab = d2l.load_data_imdb(batch_size)
-    logger.info('loading dataset imdb end')
     embed_size, num_hiddens, num_layers, devices = 100, 100, 2, d2l.try_all_gpus()
     net = rnn_base.BiRNN(len(vocab), embed_size, num_hiddens, num_layers)
 
@@ -38,20 +41,14 @@ def lstm_train(lr=0.01, epochs=5):
     trainer = torch.optim.Adam(net.parameters(), lr=lr)
     loss = nn.CrossEntropyLoss(reduction="none")
     d2l.train_ch13(net, train_iter, test_iter, loss, trainer, epochs, devices)
-    torch.save(net.state_dict(), 'model/sentiment_lstm.pth')
+    torch.save(net.state_dict(), 'model/sentiment_lstm_local.pth')
 
 
 # @save
 def lstm_infer(sequence):
-    logger.info('loading dataset imdb start')
-    print('loading dataset imdb start: ', datetime.datetime.now())
-    batch_size = 128
-    train_iter, test_iter, vocab = d2l.load_data_imdb(batch_size)
-    logger.info('loading dataset imdb end')
-    print('loading dataset imdb end:', datetime.datetime.now())
     embed_size, num_hiddens, num_layers, devices = 100, 100, 2, d2l.try_all_gpus()
     model = rnn_base.BiRNN(len(vocab), embed_size, num_hiddens, num_layers)
-    model.load_state_dict(torch.load('model/sentiment_lstm.pth'))
+    model.load_state_dict(torch.load('model/sentiment_lstm_local.pth'))
     model = model.to(d2l.try_gpu())
     model.eval()  # 设置模型为推理模式
     """Predict the sentiment of a text sequence."""
@@ -61,7 +58,7 @@ def lstm_infer(sequence):
 
 
 # batch_size = 64 读取imdb耗时3分钟半
-# lstm_train(epochs=1)
+# lstm_train(epochs=5)
 print(lstm_infer("I may consider myself lucky to be alive to watch Christopher Nolan Works which get better by "
                  "years.Oppenheimer is - with no doubt-going to be one of the best movies in the history. Amazing "
                  "cinematography, Exceptional acting and terrifying Soundtracks.All the cast are great from cilian "
