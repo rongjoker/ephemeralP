@@ -149,7 +149,7 @@ def renet_infer_batch():
     input_image_list = []
     for file in os.listdir('test'):
         print(file)
-        out_ = preprocess_image(  'test/' + file)
+        out_ = preprocess_image('test/' + file)
         input_image_list.append(out_[0])
     ndarray_data = np.asarray(input_image_list)
     input_image = torch.from_numpy(ndarray_data)
@@ -200,7 +200,13 @@ def get_img(path):
 # resnet_train(epoch=50, batch_size=128)
 # resnet_infer()
 renet_infer_batch()
+
 # 0.9375 batch_size 256 max_epochs 20
 # vit_train(epoch=50, batch_size=256)
 # vit_infer()
 # get_img('test/pant1.png')
+
+
+# # 定义训练函数
+# # 检查torch.cuda是否可用，否则继续使用CPU
+
