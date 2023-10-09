@@ -22,9 +22,8 @@ def vit_train(epoch=10, batch_size=128):
 
 def resnet_train(epoch=10, batch_size=128):
     # 10 epoch acc: tensor(0.9375, device='cuda:0')
-    base.ResNet18().layer_summary((1, 1, 96, 96))
-
-    model = base.ResNet18(lr=0.01)
+    base.ResNet18(lr=0.01, num_classes=176).layer_summary((1, 1, 96, 96))
+    model = base.ResNet18(lr=0.01, num_classes=10)
     trainer = d2l.Trainer(max_epochs=epoch, num_gpus=1)
     data = d2l.FashionMNIST(batch_size=batch_size, resize=(96, 96))
     model.apply_init([next(iter(data.get_dataloader(True)))[0]], d2l.init_cnn)
@@ -197,9 +196,9 @@ def get_img(path):
 
 # max_epochs=50 batch_size=256 0.9375
 # max_epochs=50 batch_size=128
-# resnet_train(epoch=50, batch_size=128)
+resnet_train(epoch=50, batch_size=128)
 # resnet_infer()
-renet_infer_batch()
+# renet_infer_batch()
 
 # 0.9375 batch_size 256 max_epochs 20
 # vit_train(epoch=50, batch_size=256)

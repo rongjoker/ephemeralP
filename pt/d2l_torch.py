@@ -223,6 +223,8 @@ class Module(d2l.nn_Module, d2l.HyperParameters):
                         every_n=int(n))
 
     def training_step(self, batch):
+        a = batch[-1]
+        b = self(*batch[:-1])
         l = self.loss(self(*batch[:-1]), batch[-1])
         self.plot('loss', l, train=True)
         # print('loss:', l)
@@ -505,8 +507,8 @@ class Classifier(d2l.Module):
 
     def validation_step(self, batch):
         Y_hat = self(*batch[:-1])
-        print('loss:', self.loss(Y_hat, batch[-1]))
-        print('acc:', self.accuracy(Y_hat, batch[-1]))
+        # print('loss:', self.loss(Y_hat, batch[-1]))
+        # print('acc:', self.accuracy(Y_hat, batch[-1]))
         self.plot('loss', self.loss(Y_hat, batch[-1]), train=False)
         self.plot('acc', self.accuracy(Y_hat, batch[-1]), train=False)
 
