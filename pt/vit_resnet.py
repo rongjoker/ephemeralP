@@ -6,6 +6,57 @@ import d2l_torch as d2l
 import cnn_base as base
 import numpy as np
 import os
+import torchvision
+import pandas as pd
+
+data_dir = "model/"
+
+
+def accuracy(y_hat, y):
+    return (y_hat.argmax(1) == y).sum()
+
+
+def train_baba(net, train_iter, test_iter, num_epochs, lr):
+    model_path = 'model/train_detail_resnet_18_%s.pth' % num_epochs
+    print('model_path:', model_path)
+    net = net.to('cuda:0')
+    print(net)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    loss = nn.CrossEntropyLoss()
+    train_detail = pd.DataFrame(columns=['train_loss', 'test_loss', 'train acc', 'test acc'])
+    animator = d2l.Animator(xlabel='epoch', xlim=[1, num_epochs],
+                            legend=['train_loss', 'test_loss', 'train acc', 'test acc'])
+    for epoch in range(num_epochs):
+        train_loss_tot, train_acc_tot, train_tot = 0, 0, 0
+        test_loss_tot, test_acc_tot, test_tot = 0, 0, 0
+        net.train()
+        for X, y in train_iter:
+            optimizer.zero_grad()
+            X, y = X.to('cuda:0'), y.to('cuda:0')
+            y_hat = net(X)
+            l = loss(y_hat, y)
+            l.backward()
+            optimizer.step()
+            with torch.no_grad():
+                train_loss_tot += l * X.shape[0]
+                train_acc_tot += accuracy(y_hat, y)
+                train_tot += X.shape[0]
+        net.eval()
+        with torch.no_grad():
+            for X, y in test_iter:
+                X, y = X.to('cuda:0'), y.to('cuda:0')
+                y_hat = net(X)
+                test_loss_tot += l * X.shape[0]
+                test_acc_tot += accuracy(y_hat, y)
+                test_tot += X.shape[0]
+        train_loss = train_loss_tot / train_tot
+        train_acc = train_acc_tot / train_tot
+        test_acc = test_acc_tot / test_tot
+        test_loss = test_loss_tot / test_tot
+        animator.add(epoch + 1, (train_loss.cpu(), test_loss.cpu(), train_acc.cpu(), test_acc.cpu()))
+        train_detail.loc[len(train_detail)] = [train_loss.cpu(), test_loss.cpu(), train_acc.cpu(), test_acc.cpu()]
+        torch.save(net.state_dict(), model_path)
+        train_detail.to_csv(os.path.join(data_dir, 'train_detail_resnet_18_.csv'), index=False)
 
 
 def vit_train(epoch=10, batch_size=128):
@@ -22,11 +73,22 @@ def vit_train(epoch=10, batch_size=128):
 
 def resnet_train(epoch=10, batch_size=128):
     # 10 epoch acc: tensor(0.9375, device='cuda:0')
-    base.ResNet18(lr=0.01, num_classes=176).layer_summary((1, 1, 96, 96))
+    # base.ResNet18(lr=0.01, num_classes=10).layer_summary((1, 1, 96, 96))
     model = base.ResNet18(lr=0.01, num_classes=10)
+    # model = torchvision.models.resnet18(num_classes=10)
     trainer = d2l.Trainer(max_epochs=epoch, num_gpus=1)
     data = d2l.FashionMNIST(batch_size=batch_size, resize=(96, 96))
     model.apply_init([next(iter(data.get_dataloader(True)))[0]], d2l.init_cnn)
+    trainer.fit(model, data)
+    torch.save(model.state_dict(), 'model/fashion_mnist_resnet.pth')
+
+
+def resnet_train_18(epoch=10, batch_size=128, num_class=10):
+    model = torchvision.models.resnet18(pretrained=False)  # ****
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, num_class)
+    trainer = d2l.Trainer(max_epochs=epoch, num_gpus=1)
+    data = d2l.FashionMNIST(batch_size=batch_size, resize=(96, 96))
     trainer.fit(model, data)
     torch.save(model.state_dict(), 'model/fashion_mnist_resnet.pth')
 
@@ -194,9 +256,27 @@ def get_img(path):
     print(img.shape)
 
 
+def get_fashion_data(batch_size):
+    fashion_data = d2l.FashionMNIST(batch_size=batch_size, resize=(96, 96))
+    train_dataloader = fashion_data.get_dataloader(True)
+    test_dataloader = fashion_data.get_dataloader(False)
+    return train_dataloader, test_dataloader
+
+
+def train_minset_18():
+    train_dataloader, test_dataloader = get_fashion_data(256)
+    model = torchvision.models.resnet18(pretrained=False)  # ****
+    model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    num_ftrs = model.fc.in_features
+    model.fc = nn.Linear(num_ftrs, 10)
+    train_baba(model, train_dataloader, test_dataloader, 10, 0.01)
+
+
 # max_epochs=50 batch_size=256 0.9375
 # max_epochs=50 batch_size=128
-resnet_train(epoch=50, batch_size=128)
+# resnet_train(epoch=50, batch_size=128)
+train_minset_18()
+
 # resnet_infer()
 # renet_infer_batch()
 
@@ -208,4 +288,3 @@ resnet_train(epoch=50, batch_size=128)
 
 # # 定义训练函数
 # # 检查torch.cuda是否可用，否则继续使用CPU
-

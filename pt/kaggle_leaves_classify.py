@@ -154,9 +154,9 @@ def resnet_train(epoch=10, batch_size=128):
 
 def predict(pred_iter):
     # model = base.ResNet18(lr=learning_rate, num_classes=176)
-    # model = torchvision.models.resnet18(num_classes=176)
-    model = get_net()
-    model.load_state_dict(torch.load('model/leaves_resnet_jupyter_baba_100.pth'))
+    model = torchvision.models.resnet18(num_classes=176)
+    # model = get_net()
+    model.load_state_dict(torch.load('model/leaves_resnet_jupyter_baba_30.pth'))
     model = model.to(torch.device('cuda:0'))
     model.eval()
     prediction = []
