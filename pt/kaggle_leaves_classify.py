@@ -152,15 +152,26 @@ def resnet_train(epoch=10, batch_size=128):
     torch.save(model.state_dict(), 'model/leaves_resnet_local.pth')
 
 
+def init_weights(m):
+    if type(m) == nn.Linear or type(m) == nn.Conv2d:
+        nn.init.xavier_uniform_(m.weight)
+
+
 def predict(pred_iter):
+    print(type(pred_iter))
     # model = base.ResNet18(lr=learning_rate, num_classes=176)
     model = torchvision.models.resnet18(num_classes=176)
+    model.apply(init_weights)
+    model = nn.DataParallel(model, device_ids=[0])
     # model = get_net()
-    model.load_state_dict(torch.load('model/leaves_resnet_jupyter_baba_30.pth'))
-    model = model.to(torch.device('cuda:0'))
+    model.load_state_dict(torch.load('model/leaves_resnet_jupyter_baba_100.pth'))
+    # model = model.to(torch.device('cuda:0'))
     model.eval()
     prediction = []
     for index, X in enumerate(pred_iter):
+        print(len(X))
+        print(type(X))
+        print(X.shape)
         X = X.to('cuda:0')
         prediction.extend(train_labels_header[model(X).argmax(1).cpu()])
     test_data['label'] = prediction
@@ -169,5 +180,7 @@ def predict(pred_iter):
 
 
 # resnet_train(epoch=1, batch_size=128)
+
+# print(train_labels_header)
 
 predict(pred_iter=load_data(pred_images, None, 128, train=False))
