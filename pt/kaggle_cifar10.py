@@ -35,10 +35,11 @@ label_classe = {'airplane': 0, 'automobile': 1, 'bird': 2, 'cat': 3, 'deer': 4, 
 
 class CifarDataset(Dataset):
 
-    def __init__(self, train_dir, img_label, transform=None):
+    def __init__(self, train_dir, img_label, transform=None, is_train=True):
         self.img_label = img_label
         self.transform = transform
         self.train_dir = train_dir
+        self.is_train = is_train
 
     def __len__(self):
         return len(self.img_label)
@@ -46,17 +47,18 @@ class CifarDataset(Dataset):
     def __getitem__(self, index):
         row = self.img_label.iloc[index]
         id = str(row["id"]) + ".png"
-
-        image_path = os.path.join(self.train_dir, id)
-        label = str(row["label"])
-        label = label_classe[label]
         # image = np.array(Image.open(image_path))
+        image_path = os.path.join(self.train_dir, id)
         image = Image.open(image_path)
-
         if self.transform is not None:
             image = self.transform(image)
 
-        return image, label
+        if self.is_train:
+            label = str(row["label"])
+            label = label_classe[label]
+            return image, label
+
+        return image
 
 
 def load_data(train_dir, img_label, batch_size, train):
@@ -97,7 +99,7 @@ def get_data_loader(NUM_BATCH):
     return train_dataloader, test_dataloader
 
 
-def train(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
+def train_main(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
     def init_weights(m):
         if type(m) == nn.Linear or type(m) == nn.Conv2d:
             nn.init.xavier_uniform_(m.weight)
@@ -153,6 +155,37 @@ def train(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
         train_detail.to_csv(result_csv_path, index=False)
 
 
+def predict(test_dir, test_df, out_dir, model_path):
+    aug = [
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize([0.4914, 0.4822, 0.4465],
+                                         [0.2023, 0.1994, 0.2010])]
+    transform = transforms.Compose(aug)
+    dataset = CifarDataset(test_dir, test_df, transform, False)
+    pred_iter = torch.utils.data.DataLoader(dataset=dataset, batch_size=2048, num_workers=0, shuffle=False)
+
+    print(type(pred_iter))
+    devices = [d2l.try_gpu(i) for i in range(1)]
+    print(devices)
+    model = torchvision.models.resnet18(num_classes=10)
+    model = nn.DataParallel(model, device_ids=devices).to(devices[0])
+    model.load_state_dict(torch.load(model_path))
+
+    model.eval()
+    prediction = []
+    for index, X in enumerate(pred_iter):
+        print(type(X))
+        print(len(X))
+        print(X.shape)
+        X = X.to('cuda:0')
+
+        labels = [classe_label[i] for i in model(X).argmax(1).cpu().numpy()]
+        prediction.extend(labels)
+    test_df['label'] = prediction
+    # test_data.to_csv('./data/submission.csv', index=None)
+    test_df.to_csv(os.path.join(out_dir, 'submission.csv'), index=None)
+
+
 # n, timer = 0, d2l.Timer()
 # EPOCHS = 1
 # LEARNING_RATE = 0.1e-4
@@ -165,10 +198,7 @@ def train(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
 # timer.stop()
 # print(timer.sum())
 
-data = os.listdir(TRAIN_PATH)
-data = [name.split('.')[0] for name in os.listdir(TRAIN_PATH)]
-
-# df = pd.DataFrame(data)
-df = pd.DataFrame({'id': data})
-
-print(df.head())
+TEST_PATH = '../data/kaggle_cifar10/test/'
+data = [name.split('.')[0] for name in os.listdir(TEST_PATH)]
+df = pd.DataFrame(data, columns=['id'])
+predict(TEST_PATH, df, '../data/kaggle_cifar10/', '../data/kaggle_cifar10/model/cifar_30.pth')
