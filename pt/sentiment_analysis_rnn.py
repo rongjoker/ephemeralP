@@ -58,7 +58,7 @@ def lstm_infer(sequence):
 
 
 # batch_size = 64 读取imdb耗时3分钟半
-# lstm_train(epochs=5)
+lstm_train(epochs=5)
 print(lstm_infer("I may consider myself lucky to be alive to watch Christopher Nolan Works which get better by "
                  "years.Oppenheimer is - with no doubt-going to be one of the best movies in the history. Amazing "
                  "cinematography, Exceptional acting and terrifying Soundtracks.All the cast are great from cilian "

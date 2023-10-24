@@ -163,7 +163,7 @@ class ProgressBoard(d2l.HyperParameters):
             return
         mean = lambda x: sum(x) / len(x)
         line.append(Point(mean([p.x for p in points]),
-                          mean([p.y for p in points])))
+                          mean([p.train_y for p in points])))
         points.clear()
         if not self.display:
             return
@@ -172,7 +172,7 @@ class ProgressBoard(d2l.HyperParameters):
             self.fig = d2l.plt.figure(figsize=self.figsize)
         plt_lines, labels = [], []
         for (k, v), ls, color in zip(self.data.items(), self.ls, self.colors):
-            plt_lines.append(d2l.plt.plot([p.x for p in v], [p.y for p in v],
+            plt_lines.append(d2l.plt.plot([p.x for p in v], [p.train_y for p in v],
                                           linestyle=ls, color=color)[0])
             labels.append(k)
         axes = self.axes if self.axes else d2l.plt.gca()
