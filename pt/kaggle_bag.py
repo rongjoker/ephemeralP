@@ -198,6 +198,30 @@ class LSTM_Net(nn.Module):
         return x
 
 
+class LSTM_MODEL(nn.Module):
+    def __init__(self, embedding, embedding_dim, hidden_dim, num_layers, dropout=0.5, fix_embedding=True):
+        super(LSTM_MODEL, self).__init__()
+        # 製作 embedding layer
+        self.embedding = torch.nn.Embedding(embedding.size(0), embedding.size(1))
+        self.embedding.weight = torch.nn.Parameter(embedding)
+        # 是否將 embedding fix住，如果fix_embedding為False，在訓練過程中，embedding也會跟著被訓練
+        self.embedding.weight.requires_grad = False if fix_embedding else True
+        self.embedding_dim = embedding.size(1)
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.encoder = nn.LSTM(embedding_dim, hidden_dim, num_layers=num_layers, bidirectional=True)
+        self.decoder = nn.Linear(hidden_dim * 4, 2)
+
+    def forward(self, inputs):
+        embeddings = self.embedding(inputs.T)
+        self.encoder.flatten_parameters()
+        outputs, _ = self.encoder(embeddings)
+        encoding = torch.cat((outputs[0], outputs[-1]), dim=1)
+        outs = self.decoder(encoding)
+        # outs = self.decoder(outputs)
+        return outs
+
+
 yy_train_loss = []
 yy_valid_loss = []
 yy_train_acc = []
@@ -258,6 +282,7 @@ def training(batch_size, n_epoch, lr, model_dir, train, valid, model, device):
                                    dtype=torch.float)  # device為"cuda"，將labels轉成torch.cuda.FloatTensor，因為等等要餵進criterion，所以型態要是float
                 outputs = model(inputs)  # 將input餵給模型
                 outputs = outputs.squeeze()  # 去掉最外面的dimension，好讓outputs可以餵進criterion()
+
                 loss = criterion(outputs, labels)  # 計算此時模型的validation loss
                 correct = evaluation(outputs, labels)  # 計算此時模型的validation accuracy
                 total_acc += (correct / batch_size)
@@ -291,6 +316,10 @@ def training(batch_size, n_epoch, lr, model_dir, train, valid, model, device):
                 torch.save(model, "{}/ckpt.model".format(model_dir))
                 print('saving model with acc {:.3f}'.format(total_acc / v_batch * 100))
         print('-----------------------------------------------')
+        for name, parms in model.named_parameters():
+            print('parms.grad:', parms.grad)
+            print('-->name:', name, '-->grad_requirs:', parms.requires_grad, '--weight', torch.mean(parms.data),
+                  ' -->grad_value:', torch.mean(parms.grad))
         model.train()  # 將model的模式設為train，這樣optimizer就可以更新model的參數（因為剛剛轉成eval模式）
     # 结束for循环
 
@@ -331,11 +360,14 @@ def testing(batch_size, test_loader, model, device):
     return ret_output
 
 
+# todo loss acc as parameter
 def train_main(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
+    print(net)
+
     def accuracy(y_hat, y):
         return sum(row.all().int().item() for row in (y_hat.ge(0.5) == y))
 
-    model_path = os.path.join(out_dir, 'cifar_%s.pth' % (num_epochs))
+    model_path = os.path.join(out_dir, 'cifar_%s.pth' % num_epochs)
     result_csv_path = os.path.join(out_dir, 'train_detail_%s.csv' % num_epochs)
     print('model_path:', model_path)
     print('result_csv_path:', result_csv_path)
@@ -370,16 +402,125 @@ def train_main(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
             for X, y in test_iter:
                 X, y = X.to(devices[0]), y.to(devices[0])
                 y_hat = net(X)
+                y_hat = y_hat.squeeze()
                 test_loss_tot += l * X.shape[0]
                 test_acc_tot += accuracy(y_hat, y)
                 test_tot += X.shape[0]
         train_loss = train_loss_tot / train_tot
-        train_loss=train_loss.cpu()
+        train_loss = train_loss.cpu()
         train_acc = train_acc_tot / train_tot
         test_acc = test_acc_tot / test_tot
         test_loss = test_loss_tot / test_tot
-        test_loss=test_loss.cpu()
+        test_loss = test_loss.cpu()
         print(type(train_loss))
+        animator.add(epoch + 1, (train_loss, test_loss, train_acc, test_acc))
+        train_detail.loc[len(train_detail)] = [train_loss, test_loss, train_acc, test_acc]
+        # print('train_loss:', train_loss, '\ttrain_acc', test_acc, '\ttest_acc', test_acc)
+        torch.save(net.state_dict(), model_path)
+        train_detail.to_csv(result_csv_path, index=False)
+
+
+def train_main_para(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir, accuracy_f, loss_f):
+    print(net)
+    model_path = os.path.join(out_dir, 'cifar_%s.pth' % num_epochs)
+    result_csv_path = os.path.join(out_dir, 'train_detail_%s.csv' % num_epochs)
+    print('model_path:', model_path)
+    print('result_csv_path:', result_csv_path)
+    devices = [d2l.try_gpu(i) for i in range(num_gpus)]
+    print(devices)
+    net = nn.DataParallel(net, device_ids=devices).to(devices[0])
+    #     trainer = torch.optim.SGD(net.parameters(), lr)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    train_detail = pd.DataFrame(columns=['train_loss', 'test_loss', 'train acc', 'test acc'])
+    animator = d2l.Animator(xlabel='epoch', xlim=[1, num_epochs],
+                            legend=['train_loss', 'test_loss', 'train acc', 'test acc'])
+    for epoch in range(num_epochs):
+        train_loss_tot, train_acc_tot, train_tot = 0, 0, 0
+        test_loss_tot, test_acc_tot, test_tot = 0, 0, 0
+        net.train()
+        for X, y in train_iter:
+            optimizer.zero_grad()
+            X, y = X.to(devices[0]), y.to(devices[0])
+            y_hat = net(X)
+            l = loss_f(y_hat, y)
+            l.sum().backward()
+            # l.backward()
+            optimizer.step()
+            with torch.no_grad():
+                train_loss_tot += l.sum()
+                train_acc_tot += accuracy_f(y_hat, y)
+                train_tot += X.shape[0]
+        net.eval()
+        with torch.no_grad():
+            for X, y in test_iter:
+                X, y = X.to(devices[0]), y.to(devices[0])
+                y_hat = net(X)
+                test_loss_tot += l.sum()
+                test_acc_tot += accuracy_f(y_hat, y)
+                test_tot += X.shape[0]
+        train_loss = train_loss_tot / train_tot
+        train_acc = train_acc_tot / train_tot
+        test_acc = test_acc_tot / test_tot
+        test_loss = test_loss_tot / test_tot
+        animator.add(epoch + 1, (train_loss.cpu(), test_loss.cpu(), train_acc.cpu(), test_acc.cpu()))
+        train_detail.loc[len(train_detail)] = [train_loss.cpu(), test_loss.cpu(), train_acc.cpu(), test_acc.cpu()]
+        torch.save(net.state_dict(), model_path)
+        train_detail.to_csv(result_csv_path, index=False)
+
+
+def train_main2(net, train_iter, test_iter, num_epochs, lr, num_gpus, out_dir):
+    print(net)
+
+    def accuracy(y_hat, y):
+        return sum(row.all().int().item() for row in (y_hat.ge(0.5) == y))
+
+    model_path = os.path.join(out_dir, 'cifar_%s.pth' % num_epochs)
+    result_csv_path = os.path.join(out_dir, 'train_detail_%s.csv' % num_epochs)
+    print('model_path:', model_path)
+    print('result_csv_path:', result_csv_path)
+    devices = [d2l.try_gpu(i) for i in range(num_gpus)]
+    print(devices)
+    net = nn.DataParallel(net, device_ids=devices).to(devices[0])
+    #     trainer = torch.optim.SGD(net.parameters(), lr)
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    # loss = nn.CrossEntropyLoss(reduction="none")
+    loss = nn.BCELoss()
+    train_detail = pd.DataFrame(columns=['train_loss', 'test_loss', 'train acc', 'test acc'])
+    animator = d2l.Animator(xlabel='epoch', xlim=[1, num_epochs],
+                            legend=['train_loss', 'test_loss', 'train acc', 'test acc'])
+    for epoch in range(num_epochs):
+        train_loss_tot, train_acc_tot, train_tot = 0, 0, 0
+        test_loss_tot, test_acc_tot, test_tot = 0, 0, 0
+        net.train()
+        for X, y in train_iter:
+            with torch.autograd.detect_anomaly():
+                optimizer.zero_grad()
+                X, y = X.to(devices[0]), y.to(devices[0], dtype=torch.float)
+                y_hat = net(X)
+                y_hat = y_hat.squeeze()
+                l = loss(y_hat, y)
+                l.backward()
+                optimizer.step()
+                with torch.no_grad():
+                    train_loss_tot += l * X.shape[0]
+                    train_acc_tot += accuracy(y_hat, y)
+                    train_tot += X.shape[0]
+        net.eval()
+        with torch.no_grad():
+            for X, y in test_iter:
+                X, y = X.to(devices[0]), y.to(devices[0])
+                y_hat = net(X)
+                y_hat = y_hat.squeeze()
+                test_loss_tot += l * X.shape[0]
+                test_acc_tot += accuracy(y_hat, y)
+                test_tot += X.shape[0]
+        train_loss = train_loss_tot / train_tot
+        train_loss = train_loss.cpu()
+        train_acc = train_acc_tot / train_tot
+        test_acc = test_acc_tot / test_tot
+        test_loss = test_loss_tot / test_tot
+        test_loss = test_loss.cpu()
+        # print(type(train_loss))
         animator.add(epoch + 1, (train_loss, test_loss, train_acc, test_acc))
         train_detail.loc[len(train_detail)] = [train_loss, test_loss, train_acc, test_acc]
         # print('train_loss:', train_loss, '\ttrain_acc', test_acc, '\ttest_acc', test_acc)
@@ -401,10 +542,10 @@ testing_data = os.path.join(path_prefix, test_path)
 w2v_path = os.path.join(path_prefix, 'w2v_all.model')  # 處理word to vec model的路徑
 
 # 定義句子長度、要不要固定embedding、batch大小、要訓練幾個epoch、learning rate的值、model的資料夾路徑
-sen_len = 200
+sen_len = 300
 fix_embedding = True  # fix embedding during training
-batch_size = 128
-EPOCHS = 10
+batch_size = 512
+EPOCHS = 5
 lr = 0.001
 # model_dir = os.path.join(path_prefix, 'model/') # model directory for checkpoint model
 model_dir = path_prefix  # model directory for checkpoint model
@@ -420,7 +561,8 @@ train_x = preprocess.sentence_word2idx()
 train_y = preprocess.labels_to_tensor(train_y)
 
 # 製作一個model的對象
-model = LSTM_Net(embedding, embedding_dim=250, hidden_dim=250, num_layers=1, dropout=0.5, fix_embedding=fix_embedding)
+model = LSTM_MODEL(embedding, embedding_dim=250, hidden_dim=250, num_layers=2, dropout=0.1, fix_embedding=fix_embedding)
+# model = LSTM_Net(embedding, embedding_dim=250, hidden_dim=250, num_layers=2, dropout=0.1, fix_embedding=fix_embedding)
 model = model.to(device)  # device為"cuda"，model使用GPU來訓練(餵進去的inputs也需要是cuda tensor)
 
 # 把data分為training data跟validation data(將一部份training data拿去當作validation data)
@@ -443,6 +585,21 @@ val_loader = torch.utils.data.DataLoader(dataset=val_dataset,
                                          shuffle=False,
                                          num_workers=0)
 
+
 # 開始訓練
 # training(batch_size, EPOCHS, lr, model_dir, train_loader, val_loader, model, device)
-train_main(model, train_loader, val_loader, EPOCHS, lr,1, model_dir)
+
+
+# train_main2(model, train_loader, val_loader, EPOCHS, lr, 1, model_dir)
+
+
+def accuracy_x(y_hat, y):
+    return sum(row.all().int().item() for row in (y_hat.ge(0.5) == y))
+
+
+def accuracy_y(y_hat, y):
+    return (y_hat.argmax(1) == y).sum()
+
+
+loss_x = nn.CrossEntropyLoss(reduction="none")
+train_main_para(model, train_loader, val_loader, EPOCHS, lr, 1, model_dir, accuracy_y, loss_x)

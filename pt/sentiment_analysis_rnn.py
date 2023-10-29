@@ -27,6 +27,7 @@ def lstm_train(lr=0.01, epochs=5):
 
     embed_size, num_hiddens, num_layers, devices = 100, 100, 2, d2l.try_all_gpus()
     net = rnn_base.BiRNN(len(vocab), embed_size, num_hiddens, num_layers)
+    print(net)
 
     net.apply(init_weights)
     # Loading Pretrained Word Vectors
