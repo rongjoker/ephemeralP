@@ -562,7 +562,7 @@ train_y = preprocess.labels_to_tensor(train_y)
 
 # 製作一個model的對象
 model = LSTM_MODEL(embedding, embedding_dim=250, hidden_dim=250, num_layers=2, dropout=0.1, fix_embedding=fix_embedding)
-# model = LSTM_Net(embedding, embedding_dim=250, hidden_dim=250, num_layers=2, dropout=0.1, fix_embedding=fix_embedding)
+model = LSTM_Net(embedding, embedding_dim=250, hidden_dim=250, num_layers=2, dropout=0.1, fix_embedding=fix_embedding)
 model = model.to(device)  # device為"cuda"，model使用GPU來訓練(餵進去的inputs也需要是cuda tensor)
 
 # 把data分為training data跟validation data(將一部份training data拿去當作validation data)
