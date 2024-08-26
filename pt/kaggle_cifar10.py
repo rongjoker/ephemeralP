@@ -20,6 +20,8 @@ import random
 
 TRAIN_PATH = "../data/kaggle_cifar10/train/"
 
+print(torch.__version__)
+
 train_labels = pd.read_csv("../data/kaggle_cifar10/trainLabels.csv", header="infer")
 classes = train_labels['label'].unique()
 print(classes)
@@ -169,7 +171,7 @@ def predict(test_dir, test_df, out_dir, model_path):
     print(devices)
     model = torchvision.models.resnet18(num_classes=10)
     model = nn.DataParallel(model, device_ids=devices).to(devices[0])
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, weights_only=True))
 
     model.eval()
     prediction = []
@@ -197,6 +199,11 @@ def predict(test_dir, test_df, out_dir, model_path):
 #       out_dir=out_dir)
 # timer.stop()
 # print(timer.sum())
+
+print(torch.__version__)
+print(torch.version.cuda)
+print(torch.backends.cudnn.version())
+print(torch.cuda.is_available())
 
 TEST_PATH = '../data/kaggle_cifar10/test/'
 data = [name.split('.')[0] for name in os.listdir(TEST_PATH)]
